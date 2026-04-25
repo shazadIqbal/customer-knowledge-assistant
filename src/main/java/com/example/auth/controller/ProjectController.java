@@ -7,18 +7,21 @@ import com.example.auth.dto.UpdateProjectRequest;
 import com.example.auth.service.ProjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import javax.validation.Valid;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/management/projects")
@@ -58,6 +61,23 @@ public class ProjectController {
 
         PagedResponse<ProjectResponse> response = projectService.getAllProjects(page, size, sortBy, sortDir);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get logged-in user's projects",
+            description = "Returns a list of all projects assigned to the currently authenticated user. " +
+                    "The user is identified from the JWT token.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "User's projects retrieved successfully",
+                    content = @Content(mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(implementation = ProjectResponse.class)))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - JWT token required", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Authenticated user not found", content = @Content)
+    })
+    public ResponseEntity<List<ProjectResponse>> getMyProjects() {
+        List<ProjectResponse> projects = projectService.getMyProjects();
+        return ResponseEntity.ok(projects);
     }
 
     @GetMapping("/{id}")

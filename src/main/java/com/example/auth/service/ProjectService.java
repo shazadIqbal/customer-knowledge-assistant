@@ -11,11 +11,14 @@ import com.example.auth.exception.ResourceNotFoundException;
 import com.example.auth.repository.DatasourceRepository;
 import com.example.auth.repository.ProjectDatasourceRepository;
 import com.example.auth.repository.ProjectRepository;
+import com.example.auth.repository.UserProjectRepository;
+import com.example.auth.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +36,23 @@ public class ProjectService {
 
     @Autowired
     private ProjectDatasourceRepository projectDatasourceRepository;
+
+    @Autowired
+    private UserProjectRepository userProjectRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    public List<ProjectResponse> getMyProjects() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        com.example.auth.entity.User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));
+
+        return userProjectRepository.findByIdUserId(user.getId())
+                .stream()
+                .map(up -> toResponse(up.getProject()))
+                .collect(Collectors.toList());
+    }
 
     @Transactional
     public ProjectResponse createProject(CreateProjectRequest request) {
