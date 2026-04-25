@@ -1,10 +1,12 @@
 package com.example.auth.dto;
 
+import com.example.auth.entity.AppSource;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 @Data
@@ -22,4 +24,7 @@ public class RegisterRequest {
 
     @NotBlank(message = "Role is required")
     private String role; // e.g., "ROLE_USER" or "ROLE_ADMIN"
+
+    @NotNull(message = "App source is required")
+    private AppSource appSource;
 }

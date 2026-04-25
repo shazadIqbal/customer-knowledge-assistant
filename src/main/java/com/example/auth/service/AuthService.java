@@ -4,6 +4,7 @@ import com.example.auth.dto.JwtResponse;
 import com.example.auth.dto.LoginRequest;
 import com.example.auth.dto.RegisterRequest;
 import com.example.auth.dto.UserResponse;
+import com.example.auth.entity.AppSource;
 import com.example.auth.entity.Role;
 import com.example.auth.entity.User;
 import com.example.auth.repository.RoleRepository;
@@ -54,6 +55,7 @@ public class AuthService {
                 passwordEncoder.encode(registerRequest.getPassword()),
                 role
         );
+        user.setAppSource(registerRequest.getAppSource());
 
         userRepository.save(user);
         return "User registered successfully!";
@@ -72,6 +74,16 @@ public class AuthService {
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         String role = userDetails.getAuthorities().iterator().next().getAuthority();
+
+        // Validate appSource for ROLE_USER - only allow CHATBOT
+        User user = userRepository.findByUsername(loginRequest.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if ("ROLE_USER".equals(role)) {
+            if (user.getAppSource() != AppSource.CHATBOT) {
+                throw new RuntimeException("Login denied: ROLE_USER can only access from CHATBOT application");
+            }
+        }
 
         return new JwtResponse(jwt, userDetails.getUsername(), role);
     }

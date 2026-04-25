@@ -26,13 +26,15 @@ public class UserController {
 
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Get current user", description = "Retrieve the profile information of the currently authenticated user")
+    @Operation(summary = "Get current user profile",
+            description = "Retrieve the profile information of the currently authenticated user. " +
+                    "This endpoint requires a valid JWT token in the Authorization header.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "User information retrieved successfully",
+            @ApiResponse(responseCode = "200", description = "User profile retrieved successfully",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - JWT token required",
+            @ApiResponse(responseCode = "401", description = "Unauthorized - JWT token required or invalid",
                     content = @Content),
-            @ApiResponse(responseCode = "403", description = "Forbidden - Invalid token",
+            @ApiResponse(responseCode = "403", description = "Forbidden - Invalid or expired token",
                     content = @Content)
     })
     public ResponseEntity<UserResponse> getCurrentUser() {
