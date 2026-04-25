@@ -27,11 +27,13 @@ public class AuthController {
     private AuthService authService;
 
     @PostMapping("/register")
-    @Operation(summary = "Register a new user", description = "Create a new user account with username, password, and role")
+    @Operation(summary = "Register a new user",
+            description = "Create a new user account with username, password, role, and application source. " +
+                    "The appSource determines which application the user can access (CHATBOT or ADMINPANEL).")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "User registered successfully",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = MessageResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Username already taken or validation error",
+            @ApiResponse(responseCode = "400", description = "Username already taken, invalid role, or validation error",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
@@ -44,19 +46,23 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Login user", description = "Authenticate user and return JWT token")
+    @Operation(summary = "User login",
+            description = "Authenticate user with username and password. Returns JWT token upon successful authentication. " +
+                    "Note: ROLE_USER can only login when their appSource is set to CHATBOT. ADMINPANEL access is restricted for ROLE_USER.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Login successful, JWT token returned",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = JwtResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid username or password",
+            @ApiResponse(responseCode = "400", description = "Invalid username, password, or access denied for user's application source",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Authentication failed",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = MessageResponse.class)))
     })
     public ResponseEntity<?> loginUser(@Valid @RequestBody LoginRequest loginRequest) {
         try {
             JwtResponse jwtResponse = authService.loginUser(loginRequest);
             return ResponseEntity.ok(jwtResponse);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Invalid username or password"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
         }
     }
 }

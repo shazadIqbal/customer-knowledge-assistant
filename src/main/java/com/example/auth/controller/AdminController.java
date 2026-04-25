@@ -28,7 +28,9 @@ public class AdminController {
 
     @GetMapping("/users")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Get all users", description = "Retrieve a list of all registered users (Admin only)")
+    @Operation(summary = "Get all users (Admin only)",
+            description = "Retrieve a complete list of all registered users with their details. " +
+                    "This endpoint is restricted to users with ROLE_ADMIN.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "List of users retrieved successfully",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),

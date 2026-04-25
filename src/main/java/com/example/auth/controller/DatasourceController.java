@@ -31,7 +31,9 @@ public class DatasourceController {
     private DatasourceService datasourceService;
 
     @PostMapping
-    @Operation(summary = "Create a new datasource")
+    @Operation(summary = "Create a new datasource",
+            description = "Creates a datasource that can be linked to projects. " +
+                    "Datasources represent data repositories for retrieval-augmented generation (RAG) operations.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Datasource created successfully",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = DatasourceResponse.class))),
@@ -43,52 +45,61 @@ public class DatasourceController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all datasources (paginated)")
+    @Operation(summary = "Get all datasources with pagination",
+            description = "Returns a paginated list of all available datasources. Supports sorting and pagination parameters.")
     @ApiResponse(responseCode = "200", description = "Datasources retrieved successfully",
-            content = @Content(mediaType = "application/json"))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = PagedResponse.class)))
     public ResponseEntity<PagedResponse<DatasourceResponse>> getAllDatasources(
-            @Parameter(description = "Zero-based page index") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int size,
-            @Parameter(description = "Sort field") @RequestParam(defaultValue = "id") String sortBy,
-            @Parameter(description = "Sort direction: asc or desc") @RequestParam(defaultValue = "asc") String sortDir) {
+            @Parameter(description = "Zero-based page index (default: 0)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size (default: 10)") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Field to sort by (default: id)") @RequestParam(defaultValue = "id") String sortBy,
+            @Parameter(description = "Sort direction: 'asc' or 'desc' (default: asc)") @RequestParam(defaultValue = "asc") String sortDir) {
 
         PagedResponse<DatasourceResponse> response = datasourceService.getAllDatasources(page, size, sortBy, sortDir);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get datasource by ID")
+    @Operation(summary = "Get datasource by ID",
+            description = "Retrieve a specific datasource's details including its associated projects.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Datasource found",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = DatasourceResponse.class))),
             @ApiResponse(responseCode = "404", description = "Datasource not found", content = @Content)
     })
-    public ResponseEntity<DatasourceResponse> getDatasourceById(@PathVariable Long id) {
+    public ResponseEntity<DatasourceResponse> getDatasourceById(
+            @Parameter(description = "Datasource ID") @PathVariable Long id) {
         DatasourceResponse response = datasourceService.getDatasourceById(id);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update a datasource")
+    @Operation(summary = "Update a datasource",
+            description = "Partially updates datasource fields (name, status). " +
+                    "Updating a datasource will affect all projects linked to it.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Datasource updated successfully",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = DatasourceResponse.class))),
             @ApiResponse(responseCode = "400", description = "Validation error", content = @Content),
             @ApiResponse(responseCode = "404", description = "Datasource not found", content = @Content)
     })
-    public ResponseEntity<DatasourceResponse> updateDatasource(@PathVariable Long id,
-                                                               @Valid @RequestBody UpdateDatasourceRequest request) {
+    public ResponseEntity<DatasourceResponse> updateDatasource(
+            @Parameter(description = "Datasource ID") @PathVariable Long id,
+            @Valid @RequestBody UpdateDatasourceRequest request) {
         DatasourceResponse response = datasourceService.updateDatasource(id, request);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a datasource")
+    @Operation(summary = "Delete a datasource",
+            description = "Deletes the datasource and all associated Project_Datasource records. " +
+                    "Projects linked to this datasource will have their associations removed.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Datasource deleted successfully"),
             @ApiResponse(responseCode = "404", description = "Datasource not found", content = @Content)
     })
-    public ResponseEntity<Void> deleteDatasource(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteDatasource(
+            @Parameter(description = "Datasource ID") @PathVariable Long id) {
         datasourceService.deleteDatasource(id);
         return ResponseEntity.noContent().build();
     }

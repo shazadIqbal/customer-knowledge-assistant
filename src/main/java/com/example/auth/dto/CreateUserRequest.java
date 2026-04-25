@@ -1,5 +1,6 @@
 package com.example.auth.dto;
 
+import com.example.auth.entity.AppSource;
 import lombok.Data;
 
 import jakarta.validation.constraints.Email;
@@ -29,8 +30,11 @@ public class CreateUserRequest {
     @NotNull(message = "Role ID is required")
     private Long roleId;
 
-    @NotNull(message = "Project ID is required")
+    //@NotNull(message = "Project ID is required")
     private Long projectId;
+
+    @NotNull(message = "App source is required")
+    private AppSource appSource;
 
     // Auth credentials — required to create the underlying auth account
     @NotBlank(message = "Username is required")

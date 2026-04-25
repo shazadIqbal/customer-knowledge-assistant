@@ -47,6 +47,10 @@ public class User {
     @Column(length = 20)
     private String status = "Active";
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "app_source", nullable = false)
+    private AppSource appSource;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserRole> userRoles = new HashSet<>();
 

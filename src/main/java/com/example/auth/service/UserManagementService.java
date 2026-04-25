@@ -49,9 +49,6 @@ public class UserManagementService {
         Role role = roleRepository.findById(request.getRoleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Role", "id", request.getRoleId()));
 
-        Project project = projectRepository.findById(request.getProjectId())
-                .orElseThrow(() -> new ResourceNotFoundException("Project", "id", request.getProjectId()));
-
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -60,14 +57,20 @@ public class UserManagementService {
         user.setEmail(request.getEmail());
         user.setStatus(request.getStatus() != null ? request.getStatus() : "Active");
         user.setRole(role);
+        user.setAppSource(request.getAppSource());
 
         User savedUser = userRepository.save(user);
 
         UserRole userRole = new UserRole(savedUser, role);
         userRoleRepository.save(userRole);
 
-        UserProject userProject = new UserProject(savedUser, project);
-        userProjectRepository.save(userProject);
+        // Only add project if projectId is provided
+        if (request.getProjectId() != null) {
+            Project project = projectRepository.findById(request.getProjectId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Project", "id", request.getProjectId()));
+            UserProject userProject = new UserProject(savedUser, project);
+            userProjectRepository.save(userProject);
+        }
 
         return toDetailResponse(savedUser);
     }

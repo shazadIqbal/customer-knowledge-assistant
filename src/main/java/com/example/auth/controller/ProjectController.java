@@ -32,11 +32,12 @@ public class ProjectController {
 
     @PostMapping
     @Operation(summary = "Create a new project",
-            description = "Creates a project and links it to a datasource (Project_Datasource) with api_key and folder_url")
+            description = "Creates a project and links it to a datasource (Project_Datasource association) with API credentials (api_key) and folder URL. " +
+                    "Projects represent data sources that users can access for retrieval-augmented generation (RAG).")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Project created successfully",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ProjectResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Validation error", content = @Content),
+            @ApiResponse(responseCode = "400", description = "Validation error or invalid path pattern", content = @Content),
             @ApiResponse(responseCode = "404", description = "Datasource not found", content = @Content)
     })
     public ResponseEntity<ProjectResponse> createProject(@Valid @RequestBody CreateProjectRequest request) {
@@ -45,54 +46,61 @@ public class ProjectController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all projects (paginated)")
+    @Operation(summary = "Get all projects with pagination",
+            description = "Returns a paginated list of all projects. Supports sorting and pagination parameters.")
     @ApiResponse(responseCode = "200", description = "Projects retrieved successfully",
-            content = @Content(mediaType = "application/json"))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = PagedResponse.class)))
     public ResponseEntity<PagedResponse<ProjectResponse>> getAllProjects(
-            @Parameter(description = "Zero-based page index") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int size,
-            @Parameter(description = "Sort field") @RequestParam(defaultValue = "id") String sortBy,
-            @Parameter(description = "Sort direction: asc or desc") @RequestParam(defaultValue = "asc") String sortDir) {
+            @Parameter(description = "Zero-based page index (default: 0)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size (default: 10)") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Field to sort by (default: id)") @RequestParam(defaultValue = "id") String sortBy,
+            @Parameter(description = "Sort direction: 'asc' or 'desc' (default: asc)") @RequestParam(defaultValue = "asc") String sortDir) {
 
         PagedResponse<ProjectResponse> response = projectService.getAllProjects(page, size, sortBy, sortDir);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get project by ID")
+    @Operation(summary = "Get project by ID",
+            description = "Retrieve a specific project's details including its datasource associations and configuration.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Project found",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ProjectResponse.class))),
             @ApiResponse(responseCode = "404", description = "Project not found", content = @Content)
     })
-    public ResponseEntity<ProjectResponse> getProjectById(@PathVariable Long id) {
+    public ResponseEntity<ProjectResponse> getProjectById(
+            @Parameter(description = "Project ID") @PathVariable Long id) {
         ProjectResponse response = projectService.getProjectById(id);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Update a project",
-            description = "Partially updates project fields (name, path, database_table_name, status)")
+            description = "Partially updates project fields (name, path, database_table_name, status). " +
+                    "The path field should match the pattern for folder URLs.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Project updated successfully",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ProjectResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Validation error", content = @Content),
+            @ApiResponse(responseCode = "400", description = "Validation error or invalid path pattern", content = @Content),
             @ApiResponse(responseCode = "404", description = "Project not found", content = @Content)
     })
-    public ResponseEntity<ProjectResponse> updateProject(@PathVariable Long id,
-                                                         @Valid @RequestBody UpdateProjectRequest request) {
+    public ResponseEntity<ProjectResponse> updateProject(
+            @Parameter(description = "Project ID") @PathVariable Long id,
+            @Valid @RequestBody UpdateProjectRequest request) {
         ProjectResponse response = projectService.updateProject(id, request);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a project",
-            description = "Deletes the project and all associated Project_Datasource records")
+            description = "Deletes the project and all associated Project_Datasource records. " +
+                    "Users assigned to this project will have their User_Project associations removed.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Project deleted successfully"),
             @ApiResponse(responseCode = "404", description = "Project not found", content = @Content)
     })
-    public ResponseEntity<Void> deleteProject(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteProject(
+            @Parameter(description = "Project ID") @PathVariable Long id) {
         projectService.deleteProject(id);
         return ResponseEntity.noContent().build();
     }
