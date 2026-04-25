@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/v1/project-datasource")
+@RequestMapping("/api/project-datasource")
 @Tag(name = "Project Datasource Integration", description = "Connect datasources to projects and fetch external data")
 public class ProjectDatasourceController {
 
