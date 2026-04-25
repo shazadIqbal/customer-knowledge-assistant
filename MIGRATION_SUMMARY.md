@@ -1,387 +1,159 @@
-# Migration Summary: PostgreSQL → MS SQL Server + Flyway
+# Migration Summary: MS SQL Server → PostgreSQL
 
-## ✅ Changes Completed
+## Changes Completed
 
-### 1. Database Migration: PostgreSQL → MS SQL Server
-
-**Updated Files:**
-- `pom.xml` - Replaced PostgreSQL driver with MS SQL Server driver
-- `application.properties` - Updated database configuration for MS SQL Server
-- `README.md` - Updated all references from PostgreSQL to MS SQL Server
-- `DATABASE_SETUP.md` - Complete rewrite for MS SQL Server setup
-
-**Changes:**
-```diff
-# Old (PostgreSQL)
-- spring.datasource.url=jdbc:postgresql://localhost:5432/jwt_auth_db
-- spring.datasource.driver-class-name=org.postgresql.Driver
-- spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
-
-# New (MS SQL Server)
-+ spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=TEST_DB;encrypt=true;trustServerCertificate=true
-+ spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
-+ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.SQLServerDialect
-```
-
-### 2. Database Name Change: jwt_auth_db → TEST_DB
-
-All configurations now use `TEST_DB` as the database name.
-
-### 3. Flyway Migration Integration
-
-**New Dependencies Added (pom.xml):**
-```xml
-<dependency>
-    <groupId>org.flywaydb</groupId>
-    <artifactId>flyway-core</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.flywaydb</groupId>
-    <artifactId>flyway-sqlserver</artifactId>
-</dependency>
-```
-
-**Flyway Configuration Added (application.properties):**
-```properties
-spring.flyway.enabled=true
-spring.flyway.baseline-on-migrate=true
-spring.flyway.locations=classpath:db/migration
-spring.flyway.sql-migration-prefix=V
-spring.flyway.sql-migration-separator=__
-spring.flyway.sql-migration-suffixes=.sql
-```
-
-**Hibernate Configuration Changed:**
-```diff
-- spring.jpa.hibernate.ddl-auto=update
-+ spring.jpa.hibernate.ddl-auto=validate
-```
-*Note: Flyway now manages schema changes, not Hibernate*
-
-### 4. Migration Scripts Created
-
-**New Directory:** `src/main/resources/db/migration/`
-
-**Migration Files:**
-
-1. **V1__create_roles_table.sql**
-   ```sql
-   CREATE TABLE roles (
-       id BIGINT IDENTITY(1,1) PRIMARY KEY,
-       name NVARCHAR(50) NOT NULL UNIQUE
-   );
-   ```
-
-2. **V2__create_users_table.sql**
-   ```sql
-   CREATE TABLE users (
-       id BIGINT IDENTITY(1,1) PRIMARY KEY,
-       username NVARCHAR(50) NOT NULL UNIQUE,
-       password NVARCHAR(100) NOT NULL,
-       role_id BIGINT NOT NULL,
-       CONSTRAINT FK_users_roles FOREIGN KEY (role_id) REFERENCES roles(id)
-   );
-   
-   CREATE INDEX IDX_users_username ON users(username);
-   CREATE INDEX IDX_users_role_id ON users(role_id);
-   ```
-
-3. **V3__insert_default_roles.sql**
-   ```sql
-   INSERT INTO roles (name) VALUES ('ROLE_USER');
-   INSERT INTO roles (name) VALUES ('ROLE_ADMIN');
-   ```
-
-### 5. Code Changes
-
-**Removed:**
-- `DataInitializer.java` - No longer needed; Flyway V3 migration inserts default roles
-
-**Entity Classes:**
-- No changes required (already compatible with MS SQL Server)
-- Using `IDENTITY(1,1)` for auto-increment is handled by JPA `GenerationType.IDENTITY`
-
-### 6. New Documentation Files
-
-1. **FLYWAY_GUIDE.md** - Comprehensive Flyway migration guide
-   - Migration naming conventions
-   - Best practices
-   - Common patterns
-   - Troubleshooting
-   - Production deployment
-
-2. **QUICK_START.md** - Step-by-step setup guide
-   - Database setup options (SSMS, sqlcmd, Docker)
-   - Application configuration
-   - Build and run instructions
-   - API testing examples
-   - Troubleshooting tips
-
-3. **database-setup.sql** - SQL script for quick database creation
-   - Creates TEST_DB database
-   - Ready to use with sqlcmd
-
-### 7. Updated Documentation
-
-**README.md:**
-- Updated title and description
-- Added Quick Start section
-- Updated tech stack (MS SQL Server, Flyway)
-- Added Flyway migration section
-- Updated project structure
-- Updated configuration examples
-- Added reference to all documentation
-
-**DATABASE_SETUP.md:**
-- Complete rewrite for MS SQL Server
-- SSMS instructions
-- sqlcmd instructions
-- Docker instructions
-- SQL Server authentication setup
-- TCP/IP configuration
-- Flyway integration details
-- Troubleshooting for MS SQL Server
-- Migration management
-
-**API_EXAMPLES.md:**
-- No changes required (API remains the same)
-
----
-
-## 🎯 What This Means for Users
-
-### Before (PostgreSQL + Hibernate Auto-DDL)
-1. Install PostgreSQL
-2. Create database manually
-3. Hibernate auto-generates schema
-4. DataInitializer inserts roles on startup
-5. Schema changes require code changes
-
-### After (MS SQL Server + Flyway)
-1. Install MS SQL Server
-2. Create database using provided script
-3. **Flyway automatically creates schema from migration files**
-4. **Default roles inserted via migration**
-5. **All schema changes version-controlled in SQL files**
-6. **Migration history tracked in database**
-
----
-
-## 🔑 Key Benefits
-
-### 1. Database Version Control
-- All schema changes are in version-controlled SQL files
-- Clear history of database evolution
-- Easy to see what changed and when
-
-### 2. Repeatable Deployments
-- Same migrations produce same database state
-- No manual schema creation needed
-- Consistent across all environments
-
-### 3. Team Collaboration
-- Database changes are code-reviewed like app code
-- No schema drift between team members
-- Conflicts detected early
-
-### 4. Production Safety
-- Migrations validated before deployment
-- Rollback strategy documented
-- No accidental schema changes
-
-### 5. Enterprise Database
-- MS SQL Server is enterprise-grade
-- Better integration with Windows environments
-- SSMS for database management
-- Advanced features (stored procedures, functions, etc.)
-
----
-
-## 🔄 Migration Workflow
-
-### Old Workflow (Hibernate Auto-DDL)
-```
-1. Modify Entity class
-2. Run application
-3. Hibernate updates schema
-4. Hope it worked correctly
-```
-
-### New Workflow (Flyway)
-```
-1. Create migration file (e.g., V4__add_email.sql)
-2. Write SQL for new column
-3. Commit migration file
-4. Run application
-5. Flyway executes migration
-6. Change tracked in flyway_schema_history
-```
-
----
-
-## 📊 Project Structure Changes
+### 1. Database Driver — `pom.xml`
 
 ```diff
-src/main/
-├── java/com/example/auth/
-│   ├── config/
-│   │   ├── SecurityConfig.java
--   │   └── DataInitializer.java        [REMOVED - Replaced by Flyway]
-│   └── ...
-│
-├── resources/
-+   ├── db/migration/                    [NEW - Flyway migrations]
-+   │   ├── V1__create_roles_table.sql
-+   │   ├── V2__create_users_table.sql
-+   │   └── V3__insert_default_roles.sql
-    └── application.properties           [UPDATED - MS SQL + Flyway config]
+- <groupId>com.microsoft.sqlserver</groupId>
+- <artifactId>mssql-jdbc</artifactId>
 
-Root directory/
-├── pom.xml                              [UPDATED - MS SQL + Flyway deps]
-├── README.md                            [UPDATED - MS SQL + Flyway docs]
-+├── QUICK_START.md                      [NEW]
-+├── FLYWAY_GUIDE.md                     [NEW]
-+├── database-setup.sql                  [NEW]
-└── DATABASE_SETUP.md                    [UPDATED - MS SQL instructions]
++ <groupId>org.postgresql</groupId>
++ <artifactId>postgresql</artifactId>
+```
+
+```diff
+- <artifactId>flyway-sqlserver</artifactId>   ← removed (PostgreSQL needs only flyway-core)
 ```
 
 ---
 
-## 🚀 How to Use
+### 2. Application Configuration — `application.properties`
 
-### First-Time Setup
+```diff
+- spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=CKA_DB;encrypt=true;trustServerCertificate=true
+- spring.datasource.username=sa
+- spring.datasource.password=Avanza123
+- spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
+- spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.SQLServerDialect
 
-1. **Create Database:**
-   ```bash
-   sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -i database-setup.sql
-   ```
-
-2. **Update Configuration** (if needed):
-   ```properties
-   # src/main/resources/application.properties
-   spring.datasource.username=sa
-   spring.datasource.password=YourStrong@Passw0rd
-   ```
-
-3. **Run Application:**
-   ```bash
-   mvn spring-boot:run
-   ```
-
-4. **Flyway automatically:**
-   - Creates roles table
-   - Creates users table
-   - Inserts default roles
-   - Tracks migrations in flyway_schema_history
-
-### Adding New Features
-
-**Example: Add email to users**
-
-1. Create `V4__add_email_to_users.sql`:
-   ```sql
-   ALTER TABLE users ADD email NVARCHAR(100);
-   GO
-   CREATE UNIQUE INDEX IDX_users_email ON users(email) WHERE email IS NOT NULL;
-   GO
-   ```
-
-2. Restart application - Flyway runs V4 migration automatically
-
-3. Update User entity:
-   ```java
-   @Column(length = 100)
-   private String email;
-   ```
++ spring.datasource.url=jdbc:postgresql://localhost:5432/cka_db
++ spring.datasource.username=postgres
++ spring.datasource.password=postgres
++ spring.datasource.driver-class-name=org.postgresql.Driver
++ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+```
 
 ---
 
-## 🔍 Verification
+### 3. Flyway Migration Scripts
 
-### Check Flyway Migrations
+All six migration files were updated. Key SQL syntax changes:
 
+| MS SQL Server | PostgreSQL |
+|---|---|
+| `BIGINT IDENTITY(1,1) PRIMARY KEY` | `BIGSERIAL PRIMARY KEY` |
+| `NVARCHAR(n)` | `VARCHAR(n)` |
+| `ALTER TABLE t ADD col TYPE` | `ALTER TABLE t ADD COLUMN col TYPE` |
+| `CREATE INDEX … WHERE …` (filtered) | `CREATE INDEX …` (plain index) |
+
+#### V1 — roles table
 ```sql
-SELECT * FROM flyway_schema_history ORDER BY installed_rank;
+-- PostgreSQL
+CREATE TABLE roles (
+    id   BIGSERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
 ```
 
-**Expected Result:**
-```
-installed_rank | version | description           | success
----------------|---------|----------------------|--------
-1              | 1       | create roles table   | 1
-2              | 2       | create users table   | 1
-3              | 3       | insert default roles | 1
-```
-
-### Check Tables Created
-
+#### V2 — users table
 ```sql
-SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE';
+-- PostgreSQL
+CREATE TABLE users (
+    id       BIGSERIAL    PRIMARY KEY,
+    username VARCHAR(50)  NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    role_id  BIGINT       NOT NULL,
+    CONSTRAINT fk_users_roles FOREIGN KEY (role_id) REFERENCES roles(id)
+);
 ```
 
-**Expected Result:**
-```
-TABLE_NAME
-------------------
-flyway_schema_history
-roles
-users
-```
-
-### Check Default Roles
-
+#### V4 — extend users + user_role
 ```sql
-SELECT * FROM roles;
+-- PostgreSQL (ADD COLUMN, VARCHAR, no filtered index)
+ALTER TABLE users ADD COLUMN fullname  VARCHAR(100);
+ALTER TABLE users ADD COLUMN job_title VARCHAR(100);
+ALTER TABLE users ADD COLUMN email     VARCHAR(150);
+ALTER TABLE users ADD COLUMN status    VARCHAR(20) DEFAULT 'Active';
+CREATE INDEX idx_users_email ON users(email);
+
+CREATE TABLE user_role (
+    user_id BIGINT NOT NULL,
+    role_id BIGINT NOT NULL,
+    CONSTRAINT pk_user_role       PRIMARY KEY (user_id, role_id),
+    CONSTRAINT fk_user_role_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_role_roles FOREIGN KEY (role_id) REFERENCES roles(id)
+);
 ```
 
-**Expected Result:**
-```
-id | name
----|------------
-1  | ROLE_USER
-2  | ROLE_ADMIN
-```
-
----
-
-## 📝 Important Notes
-
-1. **Never modify executed migrations** - Create new migrations instead
-2. **Flyway validates checksums** - Prevents accidental changes
-3. **Use `validate` mode** - Hibernate no longer manages schema
-4. **Version control all migrations** - Commit SQL files to Git
-5. **Test migrations locally** - Before deploying to production
-
----
-
-## 🆘 Troubleshooting
-
-### Flyway migration failed?
-```bash
-mvn flyway:repair
+#### V5 — projects + user_project
+```sql
+CREATE TABLE projects (
+    id                  BIGSERIAL    PRIMARY KEY,
+    name                VARCHAR(100) NOT NULL,
+    path                VARCHAR(255),
+    database_table_name VARCHAR(100),
+    status              VARCHAR(20)  NOT NULL DEFAULT 'Active'
+);
+CREATE TABLE user_project ( … );
 ```
 
-### Need to reset database?
-```bash
-# Drop and recreate database
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -i database-setup.sql
-```
-
-### Check migration status
-```bash
-mvn flyway:info
+#### V6 — datasources + project_datasource
+```sql
+CREATE TABLE datasources (
+    id     BIGSERIAL    PRIMARY KEY,
+    name   VARCHAR(100) NOT NULL,
+    status VARCHAR(20)  NOT NULL DEFAULT 'Active'
+);
+CREATE TABLE project_datasource ( … );
 ```
 
 ---
 
-## 📚 Documentation References
+### 4. JPA Entity Classes
 
-- [README.md](README.md) - Main documentation
-- [QUICK_START.md](QUICK_START.md) - Getting started guide
-- [FLYWAY_GUIDE.md](FLYWAY_GUIDE.md) - Detailed Flyway usage
-- [DATABASE_SETUP.md](DATABASE_SETUP.md) - MS SQL Server setup
-- [API_EXAMPLES.md](API_EXAMPLES.md) - API testing examples
+All `columnDefinition = "NVARCHAR(n)"` attributes were replaced with standard JPA `length = n`:
+
+```diff
+- @Column(nullable = false, unique = true, columnDefinition = "NVARCHAR(50)")
++ @Column(nullable = false, unique = true, length = 50)
+  private String username;
+
+- @Column(columnDefinition = "NVARCHAR(100)")
++ @Column(length = 100)
+  private String fullname;
+```
+
+Affected entities: `User`, `Role`, `Project`, `Datasource`, `ProjectDatasource`
 
 ---
 
-**Summary:** Successfully migrated from PostgreSQL to MS SQL Server, changed database name to TEST_DB, and integrated Flyway for professional database version control and migrations! 🎉
+## Why These Changes Were Necessary
+
+| Feature | MS SQL Server | PostgreSQL |
+|---|---|---|
+| Auto-increment PK | `BIGINT IDENTITY(1,1)` | `BIGSERIAL` |
+| Unicode string | `NVARCHAR(n)` | `VARCHAR(n)` (UTF-8 by default) |
+| Add column DDL | `ADD col TYPE` | `ADD COLUMN col TYPE` |
+| Flyway extension | `flyway-sqlserver` required | `flyway-core` sufficient |
+| JDBC driver | `mssql-jdbc` | `postgresql` |
+| Hibernate dialect | `SQLServerDialect` | `PostgreSQLDialect` |
+| Default port | 1433 | 5432 |
+
+---
+
+## Important Notes
+
+1. **Never modify executed migrations** — always create a new version file instead
+2. **Flyway validates checksums** — prevents accidental modification of applied migrations
+3. **`ddl-auto=validate`** — Hibernate validates but never alters schema; Flyway owns all DDL
+4. Commit all migration SQL files to version control alongside application code
+
+---
+
+## References
+
+- [QUICK_START.md](QUICK_START.md) — Getting started with PostgreSQL
+- [DATABASE_SETUP.md](DATABASE_SETUP.md) — Full PostgreSQL setup guide
+- [FLYWAY_GUIDE.md](FLYWAY_GUIDE.md) — Migration patterns and best practices
+- [API_EXAMPLES.md](API_EXAMPLES.md) — API testing examples

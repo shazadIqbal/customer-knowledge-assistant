@@ -4,9 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import javax.persistence.*;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Size;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -23,16 +23,16 @@ public class Project {
 
     @NotBlank
     @Size(max = 100)
-    @Column(nullable = false, columnDefinition = "NVARCHAR(100)")
+    @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(columnDefinition = "NVARCHAR(255)")
+    @Column(length = 255)
     private String path;
 
-    @Column(name = "database_table_name", columnDefinition = "NVARCHAR(100)")
+    @Column(name = "database_table_name", length = 100)
     private String databaseTableName;
 
-    @Column(nullable = false, columnDefinition = "NVARCHAR(20)")
+    @Column(nullable = false, length = 20)
     private String status = "Active";
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)

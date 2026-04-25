@@ -4,54 +4,46 @@ Get the Spring Boot JWT Authentication application running in minutes!
 
 ## Prerequisites
 
-- ✅ Java 11 or higher installed
-- ✅ Maven 3.6+ installed
-- ✅ MS SQL Server installed and running
-- ✅ Git (optional)
+- Java 11 or higher installed
+- Maven 3.6+ installed
+- PostgreSQL 13+ installed and running
+- Git (optional)
 
-## Step 1: Setup MS SQL Server
+---
 
-### Option A: Using SQL Server Management Studio (SSMS)
+## Step 1: Setup PostgreSQL
 
-1. Open SSMS
-2. Connect using:
-   - Server: `localhost`
-   - Authentication: `SQL Server Authentication`
-   - Login: `sa`
-   - Password: `YourStrong@Passw0rd`
+### Option A: Local Installation
 
-3. Run the setup script:
-   - Open `database-setup.sql`
-   - Execute (or press F5)
+**Windows** — Download the installer from https://www.postgresql.org/download/windows/ and run it.  
+**macOS** — `brew install postgresql@15 && brew services start postgresql@15`  
+**Ubuntu/Debian** — `sudo apt install postgresql postgresql-contrib && sudo systemctl start postgresql`
 
-### Option B: Using sqlcmd
+### Option B: Docker (Cross-platform)
 
 ```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -i database-setup.sql
+docker run --name postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_USER=postgres \
+  -p 5432:5432 \
+  -d postgres:15
 ```
 
-### Option C: Using Docker
+### Create the database
 
 ```bash
-# Start SQL Server in Docker
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=YourStrong@Passw0rd" \
-   -p 1433:1433 --name sql-server \
-   -d mcr.microsoft.com/mssql/server:2022-latest
+# Using psql CLI
+psql -U postgres -c "CREATE DATABASE cka_db;"
 
-# Wait 30 seconds for SQL Server to start
-# Create database
-docker exec -it sql-server /opt/mssql-tools/bin/sqlcmd \
-   -S localhost -U sa -P YourStrong@Passw0rd \
-   -Q "CREATE DATABASE TEST_DB"
+# Or inside Docker
+docker exec -it postgres psql -U postgres -c "CREATE DATABASE cka_db;"
 ```
 
-### Verify Database
+### Verify
 
 ```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -Q "SELECT name FROM sys.databases WHERE name='TEST_DB'"
+psql -U postgres -c "\l" | grep cka_db
 ```
-
-Expected output: `TEST_DB`
 
 ---
 
@@ -60,23 +52,18 @@ Expected output: `TEST_DB`
 Open `src/main/resources/application.properties` and update if needed:
 
 ```properties
-# Update these if your SQL Server credentials are different
-spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=TEST_DB;encrypt=true;trustServerCertificate=true
-spring.datasource.username=sa
-spring.datasource.password=YourStrong@Passw0rd
+# PostgreSQL connection
+spring.datasource.url=jdbc:postgresql://localhost:5432/cka_db
+spring.datasource.username=postgres
+spring.datasource.password=postgres
 ```
-
-**Note**: Default configuration should work if you used `sa` with password `YourStrong@Passw0rd`
 
 ---
 
 ## Step 3: Build the Application
 
 ```bash
-# Navigate to project directory
-cd base-project
-
-# Clean and build
+cd customer-knowledge-assistant
 mvn clean install
 ```
 
@@ -94,25 +81,25 @@ Expected output:
 mvn spring-boot:run
 ```
 
-### What Happens?
+### What Happens on First Start?
 
-1. ✅ Application starts on port 8080
-2. ✅ Flyway runs migrations automatically:
+1. Application starts on port 8080
+2. Flyway runs migrations automatically:
    - V1: Creates `roles` table
    - V2: Creates `users` table
-   - V3: Inserts default roles (ROLE_USER, ROLE_ADMIN)
-3. ✅ Application ready to accept requests
+   - V3: Inserts default roles (`ROLE_USER`, `ROLE_ADMIN`)
+   - V4: Extends `users` with business fields + creates `user_role` table
+   - V5: Creates `projects` and `user_project` tables
+   - V6: Creates `datasources` and `project_datasource` tables
+3. Application ready to accept requests
 
 ### Expected Console Output
 
 ```
-...
-Flyway Community Edition x.x.x
-Database: jdbc:sqlserver://localhost:1433 (Microsoft SQL Server x.x)
+Flyway Community Edition x.x.x by Redgate
+Database: jdbc:postgresql://localhost:5432/cka_db (PostgreSQL x.x)
 Successfully validated x migrations
-...
 Successfully applied x migrations
-...
 Started SpringJwtAuthApplication in x.xxx seconds
 ```
 
@@ -120,19 +107,21 @@ Started SpringJwtAuthApplication in x.xxx seconds
 
 ## Step 5: Test the API
 
+### Swagger UI
+
+Open your browser at: **http://localhost:8080/swagger-ui.html**
+
 ### Test 1: Register a User
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
-  -d "{\"username\":\"john_doe\",\"password\":\"password123\",\"role\":\"ROLE_USER\"}"
+  -d '{"username":"john_doe","password":"password123","role":"ROLE_USER"}'
 ```
 
-**Expected Response:**
+Expected Response:
 ```json
-{
-  "message": "User registered successfully!"
-}
+{ "message": "User registered successfully!" }
 ```
 
 ### Test 2: Login
@@ -140,10 +129,10 @@ curl -X POST http://localhost:8080/api/auth/register \
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d "{\"username\":\"john_doe\",\"password\":\"password123\"}"
+  -d '{"username":"john_doe","password":"password123"}'
 ```
 
-**Expected Response:**
+Expected Response:
 ```json
 {
   "token": "eyJhbGciOiJIUzUxMiJ9...",
@@ -153,306 +142,136 @@ curl -X POST http://localhost:8080/api/auth/login \
 }
 ```
 
-**📋 Copy the token for next step!**
+Copy the token for subsequent requests.
 
-### Test 3: Get Current User (Authenticated)
+### Test 3: Get Current User
 
 ```bash
-# Replace YOUR_TOKEN_HERE with the token from login
 curl -X GET http://localhost:8080/api/users/me \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
-**Expected Response:**
-```json
-{
-  "id": 1,
-  "username": "john_doe",
-  "role": "ROLE_USER"
-}
-```
-
-### Test 4: Register Admin User
+### Test 4: Create a Datasource
 
 ```bash
-curl -X POST http://localhost:8080/api/auth/register \
+curl -X POST http://localhost:8080/api/management/datasources \
   -H "Content-Type: application/json" \
-  -d "{\"username\":\"admin\",\"password\":\"admin123\",\"role\":\"ROLE_ADMIN\"}"
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"name":"Primary Storage","status":"Active"}'
 ```
 
-### Test 5: Login as Admin
+### Test 5: Create a Project
 
 ```bash
-curl -X POST http://localhost:8080/api/auth/login \
+curl -X POST http://localhost:8080/api/management/projects \
   -H "Content-Type: application/json" \
-  -d "{\"username\":\"admin\",\"password\":\"admin123\"}"
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"name":"Alpha","path":"/projects/alpha","databaseTableName":"alpha_data","datasourceId":1,"apiKey":"key-abc","folderUrl":"s3://bucket/alpha"}'
 ```
 
-**📋 Copy admin token!**
-
-### Test 6: Get All Users (Admin Only)
+### Test 6: Create a Managed User
 
 ```bash
-# Replace ADMIN_TOKEN_HERE with admin token
-curl -X GET http://localhost:8080/api/admin/users \
-  -H "Authorization: Bearer ADMIN_TOKEN_HERE"
-```
-
-**Expected Response:**
-```json
-[
-  {
-    "id": 1,
-    "username": "john_doe",
-    "role": "ROLE_USER"
-  },
-  {
-    "id": 2,
-    "username": "admin",
-    "role": "ROLE_ADMIN"
-  }
-]
+curl -X POST http://localhost:8080/api/management/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"username":"jane","password":"pass123","fullname":"Jane Doe","jobTitle":"Analyst","email":"jane@example.com","roleId":1,"projectId":1}'
 ```
 
 ---
 
 ## Step 6: Verify Database
 
-### Check Tables Created by Flyway
-
 ```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -d TEST_DB -Q "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'"
+# Connect to the database
+psql -U postgres -d cka_db
+
+# List tables
+\dt
+
+# Check roles
+SELECT * FROM roles;
+
+# Check Flyway history
+SELECT installed_rank, version, description, success FROM flyway_schema_history;
 ```
 
-**Expected Tables:**
-- `flyway_schema_history` - Flyway migration tracking
-- `roles` - User roles
-- `users` - User accounts
-
-### Check Default Roles
-
-```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -d TEST_DB -Q "SELECT * FROM roles"
-```
-
-**Expected Output:**
-```
-id  name
---- -----------
-1   ROLE_USER
-2   ROLE_ADMIN
-```
-
-### Check Flyway Migration History
-
-```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -d TEST_DB -Q "SELECT installed_rank, version, description, success FROM flyway_schema_history"
-```
-
-**Expected Output:**
-```
-installed_rank  version  description              success
---------------  -------  ----------------------   -------
-1               1        create roles table       1
-2               2        create users table       1
-3               3        insert default roles     1
-```
+Expected tables: `flyway_schema_history`, `roles`, `users`, `user_role`, `projects`, `user_project`, `datasources`, `project_datasource`
 
 ---
 
-## 🎉 Success!
+## Troubleshooting
 
-Your application is now running! You have:
+### Problem: Cannot connect to PostgreSQL
 
-- ✅ MS SQL Server database configured
-- ✅ Flyway migrations executed
-- ✅ Tables created (roles, users)
-- ✅ Default roles inserted
-- ✅ JWT authentication working
-- ✅ User registration working
-- ✅ Login working
-- ✅ Protected endpoints working
-- ✅ Role-based access control working
+```bash
+# Check if PostgreSQL is running
+pg_isready -h localhost -p 5432
 
----
+# Start service (Linux/macOS)
+sudo systemctl start postgresql
+brew services start postgresql   # macOS with Homebrew
 
-## 📁 Project Files Overview
-
-```
-base-project/
-│
-├── src/main/
-│   ├── java/com/example/auth/
-│   │   ├── config/           # Security configuration
-│   │   ├── controller/       # REST API endpoints
-│   │   ├── dto/              # Data transfer objects
-│   │   ├── entity/           # JPA entities (User, Role)
-│   │   ├── exception/        # Global error handling
-│   │   ├── repository/       # Database repositories
-│   │   ├── security/         # JWT utilities and filters
-│   │   └── service/          # Business logic
-│   │
-│   └── resources/
-│       ├── db/migration/     # Flyway SQL migration scripts
-│       │   ├── V1__create_roles_table.sql
-│       │   ├── V2__create_users_table.sql
-│       │   └── V3__insert_default_roles.sql
-│       └── application.properties
-│
-├── pom.xml                   # Maven dependencies
-├── database-setup.sql        # Database creation script
-│
-└── Documentation/
-    ├── README.md             # Main documentation
-    ├── API_EXAMPLES.md       # API usage examples
-    ├── DATABASE_SETUP.md     # Database configuration
-    ├── FLYWAY_GUIDE.md       # Migration guide
-    └── QUICK_START.md        # This file
+# Windows
+Start-Service postgresql-x64-15
 ```
 
----
+### Problem: Authentication failed
 
-## 🔧 Troubleshooting
+Ensure the credentials in `application.properties` match your PostgreSQL user.  
+To reset the `postgres` user password:
 
-### Problem: Cannot connect to SQL Server
-
-**Check if SQL Server is running:**
-```powershell
-Get-Service | Where-Object {$_.Name -like '*SQL*'}
-```
-
-**Start SQL Server:**
-```powershell
-Start-Service MSSQLSERVER
-```
-
-### Problem: Login failed for user 'sa'
-
-**Enable SA login:**
 ```sql
-sqlcmd -S localhost -W  # Windows Authentication
-
-ALTER LOGIN sa ENABLE;
-GO
-ALTER LOGIN sa WITH PASSWORD = 'YourStrong@Passw0rd';
-GO
+psql -U postgres
+ALTER USER postgres WITH PASSWORD 'postgres';
 ```
 
-### Problem: TCP/IP not enabled
+### Problem: Database does not exist
 
-1. Open SQL Server Configuration Manager
-2. SQL Server Network Configuration → Protocols for MSSQLSERVER
-3. Right-click TCP/IP → Enable
-4. Restart SQL Server service
-
-### Problem: Port 1433 in use
-
-**Check what's using port 1433:**
-```powershell
-netstat -ano | findstr :1433
-```
-
-### Problem: Application won't start
-
-**Check Java version:**
 ```bash
-java -version
-```
-
-Should be Java 11 or higher.
-
-**Check Maven:**
-```bash
-mvn -version
-```
-
-**Clean and rebuild:**
-```bash
-mvn clean install -U
+psql -U postgres -c "CREATE DATABASE cka_db;"
 ```
 
 ### Problem: Flyway migration failed
 
-**Check migration history:**
-```sql
-SELECT * FROM flyway_schema_history;
-```
-
-**Repair Flyway:**
 ```bash
+# Repair Flyway
 mvn flyway:repair
+
+# Or manually clear the failed entry
+psql -U postgres -d cka_db -c "DELETE FROM flyway_schema_history WHERE success = false;"
+```
+
+### Problem: Port 5432 already in use
+
+```bash
+# Find the process
+netstat -ano | findstr :5432       # Windows
+lsof -i :5432                      # Linux/macOS
 ```
 
 ---
 
-## 🚀 Next Steps
+## Project Structure
 
-### 1. Customize Application
-
-- Update JWT secret in `application.properties`
-- Change JWT expiration time
-- Add more roles
-- Add more user fields (email, phone, etc.)
-
-### 2. Add Features
-
-- Email verification
-- Password reset
-- Refresh tokens
-- User profile management
-- Audit logging
-
-### 3. Create New Migrations
-
-Create `V4__add_email_to_users.sql`:
-```sql
-ALTER TABLE users ADD email NVARCHAR(100);
-GO
-CREATE UNIQUE INDEX IDX_users_email ON users(email) WHERE email IS NOT NULL;
-GO
+```
+customer-knowledge-assistant/
+├── src/main/
+│   ├── java/com/example/auth/
+│   │   ├── config/           # Security + OpenAPI configuration
+│   │   ├── controller/       # REST controllers (Auth, Admin, Management)
+│   │   ├── dto/              # Request/Response DTOs + PagedResponse
+│   │   ├── entity/           # JPA entities (User, Role, Project, Datasource, …)
+│   │   ├── exception/        # GlobalExceptionHandler, ResourceNotFoundException
+│   │   ├── repository/       # Spring Data JPA repositories
+│   │   ├── security/         # JWT filter, util, entry point
+│   │   └── service/          # Business logic services
+│   └── resources/
+│       ├── db/migration/     # Flyway SQL migrations V1–V6
+│       └── application.properties
+└── pom.xml
 ```
 
-### 4. Deploy to Production
-
-See [Database Setup Guide](DATABASE_SETUP.md) for production best practices.
-
 ---
 
-## 📚 Learn More
-
-- [Full README](README.md) - Complete project documentation
-- [API Examples](API_EXAMPLES.md) - Detailed API examples with Postman
-- [Database Setup](DATABASE_SETUP.md) - Advanced database configuration
-- [Flyway Guide](FLYWAY_GUIDE.md) - Database migration patterns
-
----
-
-## 🆘 Need Help?
-
-1. Check the documentation in the `Documentation` folder
-2. Review error logs in console
-3. Verify database connection settings
-4. Ensure SQL Server is running
-5. Check Flyway migration history
-
----
-
-## ✅ Quick Verification Checklist
-
-Before asking for help, verify:
-
-- [ ] Java 11+ installed and in PATH
-- [ ] Maven installed and in PATH
-- [ ] SQL Server running
-- [ ] Database TEST_DB exists
-- [ ] Can connect with sa credentials
-- [ ] TCP/IP enabled for SQL Server
-- [ ] Port 1433 accessible
-- [ ] No firewall blocking connections
-- [ ] application.properties configured correctly
-- [ ] Maven build successful
-- [ ] No compilation errors
-
----
-
-**Happy Coding! 🎉**
+**Happy Coding!**

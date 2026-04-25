@@ -3,7 +3,7 @@ package com.example.auth.entity;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import javax.persistence.*;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "project_datasource")
@@ -24,10 +24,10 @@ public class ProjectDatasource {
     @JoinColumn(name = "datasource_id")
     private Datasource datasource;
 
-    @Column(name = "api_key", columnDefinition = "NVARCHAR(500)")
+    @Column(name = "api_key", length = 500)
     private String apiKey;
 
-    @Column(name = "folder_url", columnDefinition = "NVARCHAR(1000)")
+    @Column(name = "folder_url", length = 1000)
     private String folderUrl;
 
     public ProjectDatasource(Project project, Datasource datasource, String apiKey, String folderUrl) {

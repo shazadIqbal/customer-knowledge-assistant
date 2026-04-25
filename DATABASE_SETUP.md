@@ -1,120 +1,77 @@
-# Database Setup Instructions
+# Database Setup Instructions — PostgreSQL
 
-## MS SQL Server Installation
+## Installing PostgreSQL
 
 ### Windows
-1. Download SQL Server from: https://www.microsoft.com/en-us/sql-server/sql-server-downloads
-2. Download SQL Server Express (free) or Developer Edition
-3. Run the installer and choose "Basic" installation
-4. Download and install SQL Server Management Studio (SSMS): https://aka.ms/ssmsfullsetup
-5. Enable SQL Server Authentication:
-   - Open SSMS and connect to your SQL Server instance
-   - Right-click on the server → Properties → Security
-   - Select "SQL Server and Windows Authentication mode"
-   - Restart SQL Server service
+1. Download the installer from https://www.postgresql.org/download/windows/
+2. Run the installer (includes pgAdmin and command-line tools)
+3. During setup, set a password for the `postgres` superuser
+4. Leave the default port as **5432**
 
-### Setting Up SQL Server Authentication
+### macOS
+```bash
+brew install postgresql@15
+brew services start postgresql@15
+echo 'export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"' >> ~/.zshrc
+```
 
-1. Open SQL Server Configuration Manager
-2. Enable TCP/IP protocol:
-   - SQL Server Network Configuration → Protocols for MSSQLSERVER
-   - Right-click TCP/IP → Enable
-   - Restart SQL Server service
-
-3. Set SA password:
-```sql
-ALTER LOGIN sa ENABLE;
-GO
-ALTER LOGIN sa WITH PASSWORD = 'YourStrong@Passw0rd';
-GO
+### Ubuntu / Debian
+```bash
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
 ```
 
 ### Docker (Cross-platform)
 ```bash
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=YourStrong@Passw0rd" \
-   -p 1433:1433 --name sql-server \
-   -d mcr.microsoft.com/mssql/server:2022-latest
+docker run --name postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_USER=postgres \
+  -p 5432:5432 \
+  -d postgres:15
 ```
 
 ---
 
-## Database Creation
+## Creating the Database
 
-### Option 1: Using SQL Server Management Studio (SSMS)
-
-1. Open SSMS
-2. Connect to your SQL Server instance
-   - Server name: localhost
-   - Authentication: SQL Server Authentication
-   - Login: sa
-   - Password: YourStrong@Passw0rd
-3. Right-click on "Databases" → "New Database"
-4. Enter database name: `TEST_DB`
-5. Click "OK"
-
-### Option 2: Using sqlcmd Command Line
-
-1. Open Command Prompt or PowerShell
-2. Connect to SQL Server:
+### Using psql
 ```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd
+psql -U postgres -h localhost
+
+# Inside psql shell:
+CREATE DATABASE cka_db;
+\l          -- list databases to verify
+\q          -- exit
 ```
 
-3. Create database:
-```sql
-CREATE DATABASE TEST_DB;
-GO
-```
-
-4. Verify database creation:
-```sql
-SELECT name FROM sys.databases WHERE name = 'TEST_DB';
-GO
-```
-
-5. Exit sqlcmd:
-```sql
-EXIT
-```
-
-### Option 3: Using SQL File
-
-Create a file `setup.sql`:
-```sql
--- Create database
-CREATE DATABASE TEST_DB;
-GO
-
--- Use database
-USE TEST_DB;
-GO
-
--- Verify
-SELECT DB_NAME() AS CurrentDatabase;
-GO
-```
-
-Run the file:
+### Using a single command
 ```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -i setup.sql
+psql -U postgres -c "CREATE DATABASE cka_db;"
+```
+
+### Using Docker
+```bash
+docker exec -it postgres psql -U postgres -c "CREATE DATABASE cka_db;"
 ```
 
 ---
 
-## Configure Application
+## Configure the Application
 
 Update `src/main/resources/application.properties`:
 
 ```properties
-# Database Configuration
-spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=TEST_DB;encrypt=true;trustServerCertificate=true
-spring.datasource.username=sa
-spring.datasource.password=YourStrong@Passw0rd
-spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
+# PostgreSQL Database Configuration
+spring.datasource.url=jdbc:postgresql://localhost:5432/cka_db
+spring.datasource.username=postgres
+spring.datasource.password=postgres
+spring.datasource.driver-class-name=org.postgresql.Driver
 
 # JPA Configuration
 spring.jpa.hibernate.ddl-auto=validate
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.SQLServerDialect
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
 # Flyway Configuration
 spring.flyway.enabled=true
@@ -125,406 +82,250 @@ spring.flyway.baseline-on-migrate=true
 
 ## Flyway Migrations
 
-Flyway will automatically create the database schema when you run the application for the first time.
+Flyway creates the entire schema automatically on first startup.
 
-### Migration Files
+### Migration Files (`src/main/resources/db/migration/`)
 
-Located in `src/main/resources/db/migration/`:
-
-1. **V1__create_roles_table.sql** - Creates roles table
-2. **V2__create_users_table.sql** - Creates users table with foreign key
-3. **V3__insert_default_roles.sql** - Inserts ROLE_USER and ROLE_ADMIN
-
-### Adding New Migrations
-
-Create new migration files following the naming convention:
-```
-V{version}__{description}.sql
-```
-
-Examples:
-- `V4__add_email_to_users.sql`
-- `V5__create_audit_log_table.sql`
-
-Flyway executes migrations in order and tracks them in the `flyway_schema_history` table.
+| File | What it does |
+|------|-------------|
+| `V1__create_roles_table.sql` | Creates `roles` table |
+| `V2__create_users_table.sql` | Creates `users` table with FK to `roles` |
+| `V3__insert_default_roles.sql` | Seeds `ROLE_USER` and `ROLE_ADMIN` |
+| `V4__extend_users_and_user_role.sql` | Adds business columns to `users`; creates `user_role` junction table |
+| `V5__create_projects_and_user_project.sql` | Creates `projects` and `user_project` junction table |
+| `V6__create_datasources_and_project_datasource.sql` | Creates `datasources` and `project_datasource` junction table |
 
 ---
 
-## Database Schema (Created by Flyway)
+## Database Schema
 
-### roles table
+### `roles`
 ```sql
 CREATE TABLE roles (
-    id BIGINT IDENTITY(1,1) PRIMARY KEY,
-    name NVARCHAR(50) NOT NULL UNIQUE
+    id   BIGSERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
 );
 ```
 
-### users table
+### `users`
 ```sql
 CREATE TABLE users (
-    id BIGINT IDENTITY(1,1) PRIMARY KEY,
-    username NVARCHAR(50) NOT NULL UNIQUE,
-    password NVARCHAR(100) NOT NULL,
-    role_id BIGINT NOT NULL,
-    CONSTRAINT FK_users_roles FOREIGN KEY (role_id) REFERENCES roles(id)
+    id       BIGSERIAL    PRIMARY KEY,
+    username VARCHAR(50)  NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    role_id  BIGINT       NOT NULL REFERENCES roles(id),
+    fullname VARCHAR(100),
+    job_title VARCHAR(100),
+    email    VARCHAR(150),
+    status   VARCHAR(20)  DEFAULT 'Active'
 );
 ```
 
-### Initial Data (Inserted by V3 migration)
+### `user_role` (junction)
 ```sql
-INSERT INTO roles (name) VALUES ('ROLE_USER');
-INSERT INTO roles (name) VALUES ('ROLE_ADMIN');
+CREATE TABLE user_role (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id BIGINT NOT NULL REFERENCES roles(id),
+    PRIMARY KEY (user_id, role_id)
+);
+```
+
+### `projects`
+```sql
+CREATE TABLE projects (
+    id                  BIGSERIAL    PRIMARY KEY,
+    name                VARCHAR(100) NOT NULL,
+    path                VARCHAR(255),
+    database_table_name VARCHAR(100),
+    status              VARCHAR(20)  NOT NULL DEFAULT 'Active'
+);
+```
+
+### `user_project` (junction)
+```sql
+CREATE TABLE user_project (
+    user_id    BIGINT NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, project_id)
+);
+```
+
+### `datasources`
+```sql
+CREATE TABLE datasources (
+    id     BIGSERIAL    PRIMARY KEY,
+    name   VARCHAR(100) NOT NULL,
+    status VARCHAR(20)  NOT NULL DEFAULT 'Active'
+);
+```
+
+### `project_datasource` (junction with payload)
+```sql
+CREATE TABLE project_datasource (
+    project_id    BIGINT        NOT NULL REFERENCES projects(id)    ON DELETE CASCADE,
+    datasource_id BIGINT        NOT NULL REFERENCES datasources(id) ON DELETE CASCADE,
+    api_key       VARCHAR(500),
+    folder_url    VARCHAR(1000),
+    PRIMARY KEY (project_id, datasource_id)
+);
 ```
 
 ---
 
 ## Verify Database Setup
 
-1. Connect to the database using SSMS or sqlcmd:
 ```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -d TEST_DB
-```
+psql -U postgres -d cka_db
 
-2. Check tables (after running the application):
-```sql
-SELECT TABLE_NAME 
-FROM INFORMATION_SCHEMA.TABLES 
-WHERE TABLE_TYPE = 'BASE TABLE';
-GO
-```
+-- List all tables
+\dt
 
-Expected output:
-```
-TABLE_NAME
------------------
-flyway_schema_history
-roles
-users
-```
-
-3. Check roles:
-```sql
+-- Check roles
 SELECT * FROM roles;
-GO
+
+-- Check Flyway migration history
+SELECT installed_rank, version, description, success
+FROM flyway_schema_history
+ORDER BY installed_rank;
 ```
 
-Expected output:
-```
-id    name
-----  -----------
-1     ROLE_USER
-2     ROLE_ADMIN
-```
-
-4. Check Flyway migration history:
-```sql
-SELECT * FROM flyway_schema_history;
-GO
-```
+Expected tables: `flyway_schema_history`, `roles`, `users`, `user_role`, `projects`, `user_project`, `datasources`, `project_datasource`
 
 ---
 
 ## Troubleshooting
 
-### Problem: Cannot connect to database
+### Cannot connect to PostgreSQL
 
-**Solution 1**: Check SQL Server is running
-```powershell
+```bash
+# Check if the service is up
+pg_isready -h localhost -p 5432
+
+# Linux
+sudo systemctl status postgresql
+sudo systemctl start postgresql
+
+# macOS (Homebrew)
+brew services restart postgresql@15
+
 # Windows PowerShell
-Get-Service | Where-Object {$_.Name -like '*SQL*'}
-
-# Or check in Services app (services.msc)
+Start-Service postgresql-x64-15
 ```
 
-**Solution 2**: Enable TCP/IP protocol
-1. Open SQL Server Configuration Manager
-2. SQL Server Network Configuration → Protocols
-3. Enable TCP/IP
-4. Restart SQL Server service
-
-**Solution 3**: Check firewall
-```powershell
-# Allow SQL Server through firewall
-New-NetFirewallRule -DisplayName "SQL Server" -Direction Inbound -Protocol TCP -LocalPort 1433 -Action Allow
-```
-
-### Problem: Login failed for user 'sa'
-
-**Solution**: Enable SQL Server Authentication
-```sql
--- Enable sa login and set password
-ALTER LOGIN sa ENABLE;
-GO
-ALTER LOGIN sa WITH PASSWORD = 'YourStrong@Passw0rd';
-GO
-```
-
-### Problem: Database already exists
-
-```sql
--- Drop and recreate
-USE master;
-GO
-DROP DATABASE IF EXISTS TEST_DB;
-GO
-CREATE DATABASE TEST_DB;
-GO
-```
-
-### Problem: Flyway migration fails
-
-**Solution 1**: Check migration file syntax
-- Ensure SQL syntax is correct for MS SQL Server
-- Check file naming: `V{version}__{description}.sql`
-
-**Solution 2**: Repair Flyway baseline
-```sql
--- Delete flyway history (use with caution!)
-DELETE FROM flyway_schema_history;
-```
-
-Or add to application.properties:
-```properties
-spring.flyway.clean-on-validation-error=true
-```
-
----
-
-## Reset Database
-
-To start fresh:
-
-### Using SSMS
-1. Right-click on TEST_DB → Delete
-2. Create new database
-
-### Using sqlcmd
-```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd
-```
-
-```sql
-USE master;
-GO
-DROP DATABASE IF EXISTS TEST_DB;
-GO
-CREATE DATABASE TEST_DB;
-GO
-EXIT
-```
-
----
-
-## Database Connection URL Formats
-
-### Local SQL Server (Default instance)
-```
-jdbc:sqlserver://localhost:1433;databaseName=TEST_DB;encrypt=true;trustServerCertificate=true
-```
-
-### Named Instance
-```
-jdbc:sqlserver://localhost\\SQLEXPRESS;databaseName=TEST_DB;encrypt=true;trustServerCertificate=true
-```
-
-### Remote SQL Server
-```
-jdbc:sqlserver://hostname:1433;databaseName=TEST_DB;encrypt=true;trustServerCertificate=false
-```
-
-### With Windows Authentication
-```
-jdbc:sqlserver://localhost:1433;databaseName=TEST_DB;integratedSecurity=true
-```
-
-### Custom Port
-```
-jdbc:sqlserver://localhost:1435;databaseName=TEST_DB;encrypt=true;trustServerCertificate=true
-```
-
----
-
-## Testing Database Connection
-
-### Using Java Code
-```java
-@SpringBootTest
-class DatabaseConnectionTest {
-    
-    @Autowired
-    private DataSource dataSource;
-    
-    @Test
-    void testConnection() throws SQLException {
-        assertNotNull(dataSource);
-        Connection conn = dataSource.getConnection();
-        assertTrue(conn.isValid(1));
-        conn.close();
-    }
-}
-```
-
-### Using sqlcmd
-```bash
-sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -d TEST_DB -Q "SELECT 1 AS test;"
-```
-
-Expected output:
-```
-test
-----
-1
-```
-
----
-
-## Flyway Commands
-
-### Check migration status
-Flyway tracks migrations automatically. View history:
-```sql
-SELECT * FROM flyway_schema_history ORDER BY installed_rank;
-GO
-```
-
-### Manual Flyway commands (using Maven)
+### Authentication failed (`FATAL: password authentication failed`)
 
 ```bash
-# Show migration info
+psql -U postgres
+ALTER USER postgres WITH PASSWORD 'postgres';
+```
+
+Or update `application.properties` to use the correct credentials.
+
+### Flyway migration failed
+
+```bash
+# Check current Flyway state
 mvn flyway:info
 
-# Validate migrations
-mvn flyway:validate
+# Repair (removes FAILED entries from flyway_schema_history)
+mvn flyway:repair
 
-# Migrate database
-mvn flyway:migrate
+# Manual cleanup in psql
+psql -U postgres -d cka_db -c "DELETE FROM flyway_schema_history WHERE success = false;"
+```
 
-# Clean database (DANGEROUS - deletes all objects!)
-mvn flyway:clean
+### Reset the database (start fresh)
+
+```bash
+psql -U postgres -c "DROP DATABASE IF EXISTS cka_db;"
+psql -U postgres -c "CREATE DATABASE cka_db;"
+```
+
+---
+
+## Connection URL Formats
+
+### Local default
+```
+jdbc:postgresql://localhost:5432/cka_db
+```
+
+### Remote server
+```
+jdbc:postgresql://hostname:5432/cka_db
+```
+
+### Custom port
+```
+jdbc:postgresql://localhost:5433/cka_db
+```
+
+### With SSL (production)
+```
+jdbc:postgresql://hostname:5432/cka_db?ssl=true&sslmode=require
 ```
 
 ---
 
 ## Production Considerations
 
-1. **Use environment variables**:
+### 1. Use environment variables
 ```properties
-spring.datasource.url=${DB_URL:jdbc:sqlserver://localhost:1433;databaseName=TEST_DB}
-spring.datasource.username=${DB_USERNAME:sa}
+spring.datasource.url=${DB_URL:jdbc:postgresql://localhost:5432/cka_db}
+spring.datasource.username=${DB_USERNAME:postgres}
 spring.datasource.password=${DB_PASSWORD}
 ```
 
-2. **Use connection pooling** (already included via HikariCP):
+### 2. Connection pooling (HikariCP — included by default)
 ```properties
 spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=5
 spring.datasource.hikari.connection-timeout=30000
+spring.datasource.hikari.idle-timeout=600000
 ```
 
-3. **Use validate for production**:
+### 3. Enable SSL in production
 ```properties
-# Development (with Flyway)
-spring.jpa.hibernate.ddl-auto=validate
-
-# Flyway handles all schema changes
-spring.flyway.enabled=true
-```
-
-4. **Enable SSL for production**:
-```properties
-spring.datasource.url=jdbc:sqlserver://hostname:1433;databaseName=TEST_DB;encrypt=true;trustServerCertificate=false
-```
-
-5. **Flyway baseline for existing databases**:
-```properties
-spring.flyway.baseline-on-migrate=true
-spring.flyway.baseline-version=1
+spring.datasource.url=jdbc:postgresql://hostname:5432/cka_db?ssl=true&sslmode=require
 ```
 
 ---
 
-## Creating Custom Migrations
-
-### Example: Add email column to users
-
-Create `V4__add_email_to_users.sql`:
-```sql
--- Add email column to users table
-ALTER TABLE users 
-ADD email NVARCHAR(100);
-GO
-
--- Create unique index on email
-CREATE UNIQUE INDEX IDX_users_email 
-ON users(email) 
-WHERE email IS NOT NULL;
-GO
-```
-
-### Example: Create audit log table
-
-Create `V5__create_audit_log.sql`:
-```sql
--- Create audit log table
-CREATE TABLE audit_log (
-    id BIGINT IDENTITY(1,1) PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    action NVARCHAR(50) NOT NULL,
-    timestamp DATETIME2 DEFAULT GETDATE(),
-    details NVARCHAR(MAX),
-    CONSTRAINT FK_audit_users FOREIGN KEY (user_id) REFERENCES users(id)
-);
-GO
-
--- Create index on timestamp
-CREATE INDEX IDX_audit_timestamp ON audit_log(timestamp);
-GO
-```
-
----
-
-## Useful SQL Server Queries
+## Useful PostgreSQL Queries
 
 ### List all tables
 ```sql
-SELECT TABLE_NAME 
-FROM INFORMATION_SCHEMA.TABLES 
-WHERE TABLE_TYPE = 'BASE TABLE';
-GO
+SELECT tablename FROM pg_tables WHERE schemaname = 'public';
 ```
 
-### Show table structure
+### Describe a table
 ```sql
-EXEC sp_help 'users';
-GO
-```
-
-### List all databases
-```sql
-SELECT name FROM sys.databases;
-GO
-```
-
-### Get database size
-```sql
-EXEC sp_spaceused;
-GO
+\d users
 ```
 
 ### List all foreign keys
 ```sql
-SELECT 
-    fk.name AS FK_Name,
-    tp.name AS Parent_Table,
-    cp.name AS Parent_Column,
-    tr.name AS Referenced_Table,
-    cr.name AS Referenced_Column
-FROM sys.foreign_keys AS fk
-INNER JOIN sys.foreign_key_columns AS fkc ON fk.object_id = fkc.constraint_object_id
-INNER JOIN sys.tables AS tp ON fkc.parent_object_id = tp.object_id
-INNER JOIN sys.columns AS cp ON fkc.parent_object_id = cp.object_id AND fkc.parent_column_id = cp.column_id
-INNER JOIN sys.tables AS tr ON fkc.referenced_object_id = tr.object_id
-INNER JOIN sys.columns AS cr ON fkc.referenced_object_id = cr.object_id AND fkc.referenced_column_id = cr.column_id;
-GO
+SELECT
+    tc.constraint_name,
+    tc.table_name,
+    kcu.column_name,
+    ccu.table_name  AS foreign_table,
+    ccu.column_name AS foreign_column
+FROM information_schema.table_constraints AS tc
+JOIN information_schema.key_column_usage  AS kcu USING (constraint_name, table_schema)
+JOIN information_schema.constraint_column_usage AS ccu USING (constraint_name, table_schema)
+WHERE tc.constraint_type = 'FOREIGN KEY';
+```
+
+### Database size
+```sql
+SELECT pg_size_pretty(pg_database_size('cka_db'));
+```
+
+### List all indexes
+```sql
+SELECT indexname, tablename, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+ORDER BY tablename;
 ```

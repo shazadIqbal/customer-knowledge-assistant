@@ -4,9 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import javax.persistence.*;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Size;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -23,28 +23,28 @@ public class User {
 
     @NotBlank
     @Size(min = 3, max = 50)
-    @Column(nullable = false, unique = true, columnDefinition = "NVARCHAR(50)")
+    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
     @NotBlank
     @Size(max = 100)
-    @Column(nullable = false, columnDefinition = "NVARCHAR(100)")
+    @Column(nullable = false, length = 100)
     private String password;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
-    @Column(columnDefinition = "NVARCHAR(100)")
+    @Column(length = 100)
     private String fullname;
 
-    @Column(name = "job_title", columnDefinition = "NVARCHAR(100)")
+    @Column(name = "job_title", length = 100)
     private String jobTitle;
 
-    @Column(columnDefinition = "NVARCHAR(150)")
+    @Column(length = 150)
     private String email;
 
-    @Column(columnDefinition = "NVARCHAR(20)")
+    @Column(length = 20)
     private String status = "Active";
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
